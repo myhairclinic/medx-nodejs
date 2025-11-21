@@ -5,25 +5,33 @@ const cors = require('cors');
 
 const app = express();
 
-// 🔥 Render Port Fix
+// 🔥 Railway PORT
 const PORT = process.env.PORT || 3001;
 
-// JSON ve form parsing
-app.use(cors());
+// CORS (Production için doğru)
+app.use(cors({
+    origin: "*",
+    methods: "GET,POST,PUT,DELETE",
+}));
+
+// Body parsers
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-// images klasörü oluştur
-const imagesDir = path.join(__dirname, './clinic-images');
+// images klasörü
+const imagesDir = path.join(__dirname, 'clinic-images');
 
 if (!fs.existsSync(imagesDir)) {
     fs.mkdirSync(imagesDir, { recursive: true });
 }
 
-// Statik dosya servis
+// 🔥 Statik dosya servisi
 app.use('/clinic-images', express.static(imagesDir));
 
-// 🔥 Upload API
+
+// ======================================================
+// 🔥 IMAGE UPLOAD
+// ======================================================
 app.post('/api/upload-image', (req, res) => {
     try {
         const { patientId, type, imageData } = req.body;
@@ -39,6 +47,7 @@ app.post('/api/upload-image', (req, res) => {
             fs.unlinkSync(path.join(imagesDir, oldFile));
         }
 
+        // base64 → buffer
         const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
         const buffer = Buffer.from(base64Data, 'base64');
 
@@ -47,18 +56,22 @@ app.post('/api/upload-image', (req, res) => {
 
         fs.writeFileSync(filePath, buffer);
 
-        res.json({
+        return res.json({
             success: true,
             fileName,
             path: `/clinic-images/${fileName}`
         });
+
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Upload failed' });
+        console.error("UPLOAD ERROR:", err);
+        return res.status(500).json({ error: 'Upload failed' });
     }
 });
 
-// 🔥 Get images
+
+// ======================================================
+// 🔥 GET IMAGES
+// ======================================================
 app.get('/api/get-images/:patientId', (req, res) => {
     try {
         const { patientId } = req.params;
@@ -67,34 +80,42 @@ app.get('/api/get-images/:patientId', (req, res) => {
         const before = files.find(f => f.startsWith(`${patientId}_before`));
         const after = files.find(f => f.startsWith(`${patientId}_after`));
 
-        res.json({
+        return res.json({
             before: before ? `/clinic-images/${before}` : null,
             after: after ? `/clinic-images/${after}` : null
         });
+
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Failed to fetch images' });
+        console.error("GET IMAGES ERROR:", err);
+        return res.status(500).json({ error: 'Failed to fetch images' });
     }
 });
 
-// 🔥 Delete image
+
+// ======================================================
+// 🔥 DELETE IMAGE
+// ======================================================
 app.delete('/api/delete-image/:fileName', (req, res) => {
     try {
         const filePath = path.join(imagesDir, req.params.fileName);
 
         if (fs.existsSync(filePath)) {
             fs.unlinkSync(filePath);
-            res.json({ success: true });
+            return res.json({ success: true });
         } else {
-            res.status(404).json({ error: 'Not found' });
+            return res.status(404).json({ error: 'Not found' });
         }
+
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Delete failed' });
+        console.error("DELETE ERROR:", err);
+        return res.status(500).json({ error: 'Delete failed' });
     }
 });
 
-// 🔥 Start server (important for Render)
+
+// ======================================================
+// 🔥 START SERVER
+// ======================================================
 app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+    console.log(`🔥 Server running on port ${PORT}`);
 });
